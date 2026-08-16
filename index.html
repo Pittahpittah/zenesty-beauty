@@ -303,6 +303,37 @@
     window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 })();
 
+    // --- LOAD DATA FROM SUPABASE ON PAGE LOAD ---
+window.addEventListener('DOMContentLoaded', async () => {
+    // 1. Fetch and render Staff
+    const { data: staffData, error: staffError } = await window.supabaseClient.from('staff').select('*');
+    if (!staffError && staffData) {
+        const techListEl = document.getElementById('admin-tech-list');
+        const techSelectEl = document.getElementById('tech-name-select');
+        
+        if (techListEl) techListEl.innerHTML = staffData.map(s => `<p>${s.name}</p>`).join('');
+        if (techSelectEl) {
+            techSelectEl.innerHTML = '<option value="">Select Your Name</option>' + 
+                staffData.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+        }
+    }
+
+    // 2. Fetch and render Services
+    const { data: servicesData, error: servicesError } = await window.supabaseClient.from('services').select('*');
+    if (!servicesError && servicesData) {
+        const servicesListEl = document.getElementById('admin-services-list');
+        const serviceDoneEl = document.getElementById('tech-service-done');
+
+        if (servicesListEl) {
+            servicesListEl.innerHTML = servicesData.map(srv => `<p>${srv.name} - KSh ${srv.price}</p>`).join('');
+        }
+        if (serviceDoneEl) {
+            serviceDoneEl.innerHTML = '<option value="">Select Service Completed</option>' + 
+                servicesData.map(srv => `<option value="${srv.name}">${srv.name}</option>`).join('');
+        }
+    }
+});
+    
     // --- TAB SWITCHING ---
     function showTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));

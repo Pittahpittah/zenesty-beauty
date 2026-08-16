@@ -1,0 +1,15 @@
+{
+  "short_name": "Zenesty",
+  "name": "Zenesty Beauty Studio",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#112a1d",
+  "theme_color": "#112a1d",
+  "display": "standalone"
+}

@@ -296,10 +296,12 @@
 </div>
 
 <script>
+(function() {
     // --- SUPABASE REALTIME CONFIGURATION ---
     const SUPABASE_URL = "https://ybifevtjsjjmtvxzgibv.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_1BzUMjtEJvzZbQL35gKZhA_RQ-xmDXV";
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_KEY = "sb_publishable_1BzUMjteJvzZbQL35gKZhA_RQ-xmDXV";
+    window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+})();
 
     // --- TAB SWITCHING ---
     function showTab(tabId) {

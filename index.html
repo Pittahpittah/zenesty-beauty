@@ -311,12 +311,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         const techListEl = document.getElementById('admin-tech-list');
         const techSelectEl = document.getElementById('tech-name-select');
         
-        if (techListEl) techListEl.innerHTML = staffData.map(s => `<p>${s.name}</p>`).join('');
-        if (techSelectEl) {
-            techSelectEl.innerHTML = '<option value="">Select Your Name</option>' + 
-                staffData.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+        if (techListEl) {
+            techListEl.innerHTML = staffData.map(s => `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span>${s.name}</span>
+                    <button onclick="deleteTech('${s.id}')" style="background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Remove</button>
+                </div>
+            `).join('');
         }
-    }
 
     // 2. Fetch and render Services
     const { data: servicesData, error: servicesError } = await window.supabaseClient.from('services').select('*');
@@ -398,12 +400,11 @@ async function addTech() {
         location.reload(); // Refresh to load latest records
     }
 }
-
+// --- ADD SERVICE (WITHOUT COMMISSION ERROR) ---
 async function addService() {
     const name = document.getElementById('service-name').value.trim();
     const price = document.getElementById('service-price').value.trim();
     const duration = document.getElementById('service-time').value.trim();
-    const commissionType = document.getElementById('service-commission-type').value;
 
     if (!name || !price || !duration) {
         alert("Please fill in all service details.");
@@ -415,8 +416,7 @@ async function addService() {
         .insert([{ 
             name: name, 
             price: parseFloat(price), 
-            duration: parseInt(duration), 
-            commission_type: commissionType 
+            duration: parseInt(duration)
         }]);
 
     if (error) {
@@ -426,7 +426,24 @@ async function addService() {
         document.getElementById('service-name').value = '';
         document.getElementById('service-price').value = '';
         document.getElementById('service-time').value = '';
-        location.reload(); // Refresh to load latest records
+        location.reload();
+    }
+}
+
+// --- DELETE STAFF FUNCTION ---
+async function deleteTech(techId) {
+    if (!confirm("Are you sure you want to remove this staff member?")) return;
+
+    const { error } = await window.supabaseClient
+        .from('staff')
+        .delete()
+        .eq('id', techId);
+
+    if (error) {
+        alert("Error deleting staff: " + error.message);
+    } else {
+        alert("Staff removed successfully!");
+        location.reload();
     }
 }
     

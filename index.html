@@ -186,7 +186,7 @@
         <div class="card" style="margin-top: 20px;">
             <h3>Reserved / Allocated Slots</h3>
             <div id="public-schedule-list">
-                <!-- Shows reserved slots (Tech name + status, no personal client info) -->
+                <!-- Shows reserved slots -->
             </div>
         </div>
     </div>
@@ -296,45 +296,57 @@
 </div>
 
 <script>
-(function() {
-    // --- SUPABASE REALTIME CONFIGURATION ---
+    // --- SUPABASE CONFIGURATION ---
     const SUPABASE_URL = "https://ybifevtjsjjmtvxzgibv.supabase.co";
     const SUPABASE_KEY = "sb_publishable_1BzUMjtEJvzZbQL35gKZhA_RQ-xmDXV";
     window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-})();
 
     // --- LOAD DATA FROM SUPABASE ON PAGE LOAD ---
-window.addEventListener('DOMContentLoaded', async () => {
-    // 1. Fetch and render Staff
-    const { data: staffData, error: staffError } = await window.supabaseClient.from('staff').select('*');
-    if (!staffError && staffData) {
-        const techListEl = document.getElementById('admin-tech-list');
-        const techSelectEl = document.getElementById('tech-name-select');
-        
-        if (techListEl) {
-            techListEl.innerHTML = staffData.map(s => `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span>${s.name}</span>
-                    <button onclick="deleteTech('${s.id}')" style="background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Remove</button>
-                </div>
-            `).join('');
+    window.addEventListener('DOMContentLoaded', async () => {
+        // 1. Fetch and render Staff
+        const { data: staffData, error: staffError } = await window.supabaseClient.from('staff').select('*');
+        if (!staffError && staffData) {
+            const techListEl = document.getElementById('admin-tech-list');
+            const techSelectEl = document.getElementById('tech-name-select');
+            
+            if (techListEl) {
+                techListEl.innerHTML = staffData.map(s => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span>${s.name}</span>
+                        <button onclick="deleteTech('${s.id}')" style="background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Remove</button>
+                    </div>
+                `).join('');
+            }
+
+            if (techSelectEl) {
+                techSelectEl.innerHTML = '<option value="">Select Technician</option>' + 
+                    staffData.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+            }
         }
 
-    // 2. Fetch and render Services
-    const { data: servicesData, error: servicesError } = await window.supabaseClient.from('services').select('*');
-    if (!servicesError && servicesData) {
-        const servicesListEl = document.getElementById('admin-services-list');
-        const serviceDoneEl = document.getElementById('tech-service-done');
+        // 2. Fetch and render Services
+        const { data: servicesData, error: servicesError } = await window.supabaseClient.from('services').select('*');
+        if (!servicesError && servicesData) {
+            const servicesListEl = document.getElementById('admin-services-list');
+            const serviceDoneEl = document.getElementById('tech-service-done');
+            const clientServicesEl = document.getElementById('client-services-list');
 
-        if (servicesListEl) {
-            servicesListEl.innerHTML = servicesData.map(srv => `<p>${srv.name} - KSh ${srv.price}</p>`).join('');
+            if (servicesListEl) {
+                servicesListEl.innerHTML = servicesData.map(srv => `<div class="service-item"><span>${srv.name} - KSh ${srv.price} (${srv.duration}m)</span></div>`).join('');
+            }
+            if (serviceDoneEl) {
+                serviceDoneEl.innerHTML = '<option value="">Select Service Completed</option>' + 
+                    servicesData.map(srv => `<option value="${srv.name}">${srv.name}</option>`).join('');
+            }
+            if (clientServicesEl) {
+                clientServicesEl.innerHTML = servicesData.map(srv => `
+                    <label style="display: block; margin-bottom: 5px;">
+                        <input type="checkbox" name="service" value="${srv.name}" data-price="${srv.price}"> ${srv.name} (KSh ${srv.price})
+                    </label>
+                `).join('');
+            }
         }
-        if (serviceDoneEl) {
-            serviceDoneEl.innerHTML = '<option value="">Select Service Completed</option>' + 
-                servicesData.map(srv => `<option value="${srv.name}">${srv.name}</option>`).join('');
-        }
-    }
-});
+    });
     
     // --- TAB SWITCHING ---
     function showTab(tabId) {
@@ -345,7 +357,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // --- ADMIN VERIFICATION ---
     function verifyAdmin() {
         const pass = document.getElementById('admin-pass').value;
-        if(pass === "3030") { // Default password
+        if(pass === "3030") {
             document.getElementById('admin-controls').classList.remove('hidden');
         } else {
             alert("Incorrect Admin Password!");
@@ -377,97 +389,102 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- DATABASE CRUD OPERATIONS FOR STAFF & SERVICES ---
+    async function addTech() {
+        const name = document.getElementById('new-tech-name').value.trim();
+        const pass = document.getElementById('new-tech-pass').value.trim();
 
-async function addTech() {
-    const name = document.getElementById('new-tech-name').value.trim();
-    const pass = document.getElementById('new-tech-pass').value.trim();
+        if (!name || !pass) {
+            alert("Please enter both technician name and password.");
+            return;
+        }
 
-    if (!name || !pass) {
-        alert("Please enter both technician name and password.");
-        return;
+        const { error } = await window.supabaseClient
+            .from('staff')
+            .insert([{ name: name, password: pass }]);
+
+        if (error) {
+            alert("Error adding staff: " + error.message);
+        } else {
+            alert("Staff added successfully!");
+            document.getElementById('new-tech-name').value = '';
+            document.getElementById('new-tech-pass').value = '';
+            location.reload();
+        }
     }
 
-    const { error } = await window.supabaseClient
-        .from('staff')
-        .insert([{ name: name, password: pass }]);
+    async function addService() {
+        const name = document.getElementById('service-name').value.trim();
+        const price = document.getElementById('service-price').value.trim();
+        const duration = document.getElementById('service-time').value.trim();
 
-    if (error) {
-        alert("Error adding staff: " + error.message);
-    } else {
-        alert("Staff added successfully!");
-        document.getElementById('new-tech-name').value = '';
-        document.getElementById('new-tech-pass').value = '';
-        location.reload(); // Refresh to load latest records
+        if (!name || !price || !duration) {
+            alert("Please fill in all service details.");
+            return;
+        }
+
+        const { error } = await window.supabaseClient
+            .from('services')
+            .insert([{ 
+                name: name, 
+                price: parseFloat(price), 
+                duration: parseInt(duration)
+            }]);
+
+        if (error) {
+            alert("Error adding service: " + error.message);
+        } else {
+            alert("Service added successfully!");
+            document.getElementById('service-name').value = '';
+            document.getElementById('service-price').value = '';
+            document.getElementById('service-time').value = '';
+            location.reload();
+        }
     }
-}
-// --- ADD SERVICE (WITHOUT COMMISSION ERROR) ---
-async function addService() {
-    const name = document.getElementById('service-name').value.trim();
-    const price = document.getElementById('service-price').value.trim();
-    const duration = document.getElementById('service-time').value.trim();
 
-    if (!name || !price || !duration) {
-        alert("Please fill in all service details.");
-        return;
+    async function deleteTech(techId) {
+        if (!confirm("Are you sure you want to remove this staff member?")) return;
+
+        const { error } = await window.supabaseClient
+            .from('staff')
+            .delete()
+            .eq('id', techId);
+
+        if (error) {
+            alert("Error deleting staff: " + error.message);
+        } else {
+            alert("Staff removed successfully!");
+            location.reload();
+        }
     }
-
-    const { error } = await window.supabaseClient
-        .from('services')
-        .insert([{ 
-            name: name, 
-            price: parseFloat(price), 
-            duration: parseInt(duration)
-        }]);
-
-    if (error) {
-        alert("Error adding service: " + error.message);
-    } else {
-        alert("Service added successfully!");
-        document.getElementById('service-name').value = '';
-        document.getElementById('service-price').value = '';
-        document.getElementById('service-time').value = '';
-        location.reload();
-    }
-}
-
-// --- DELETE STAFF FUNCTION ---
-async function deleteTech(techId) {
-    if (!confirm("Are you sure you want to remove this staff member?")) return;
-
-    const { error } = await window.supabaseClient
-        .from('staff')
-        .delete()
-        .eq('id', techId);
-
-    if (error) {
-        alert("Error deleting staff: " + error.message);
-    } else {
-        alert("Staff removed successfully!");
-        location.reload();
-    }
-}
     
     // --- WAITING MINI-GAME SCRIPT ---
     const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    let ballY = 75, ballDY = 0, score = 0;
-    
-    canvas.addEventListener('click', () => { ballDY = -4; score++; document.getElementById('game-score').innerText = score; });
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        let ballY = 75, ballDY = 0, score = 0;
+        
+        canvas.addEventListener('click', () => { 
+            ballDY = -4; 
+            score++; 
+            const scoreEl = document.getElementById('game-score');
+            if (scoreEl) scoreEl.innerText = score; 
+        });
 
-    function updateGame() {
-        ballDY += 0.2;
-        ballY += ballDY;
-        if(ballY > 140) { ballY = 140; ballDY = 0; }
-        if(ballY < 10) { ballY = 10; }
+        function updateGame() {
+            ballDY += 0.2;
+            ballY += ballDY;
+            if(ballY > 140) { ballY = 140; ballDY = 0; }
+            if(ballY < 10) { ballY = 10; }
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#2d5a3f';
-        ctx.beginPath();
-        ctx.arc(140, ballY, 10, 0, Math.PI * 2);
-        ctx.fill();
-        requestAnimationFrame(updateGame);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#2d5a3f';
+            ctx.beginPath();
+            ctx.arc(140, ballY, 10, 0, Math.PI * 2);
+            ctx.fill();
+            requestAnimationFrame(updateGame);
+        }
+        updateGame();
     }
-    updateGame();
 </script>
 </body>
 </html>

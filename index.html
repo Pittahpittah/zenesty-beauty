@@ -343,6 +343,62 @@
         }
     }
 
+    // --- DATABASE CRUD OPERATIONS FOR STAFF & SERVICES ---
+
+async function addTech() {
+    const name = document.getElementById('new-tech-name').value.trim();
+    const pass = document.getElementById('new-tech-pass').value.trim();
+
+    if (!name || !pass) {
+        alert("Please enter both technician name and password.");
+        return;
+    }
+
+    const { error } = await window.supabaseClient
+        .from('staff')
+        .insert([{ name: name, password: pass }]);
+
+    if (error) {
+        alert("Error adding staff: " + error.message);
+    } else {
+        alert("Staff added successfully!");
+        document.getElementById('new-tech-name').value = '';
+        document.getElementById('new-tech-pass').value = '';
+        location.reload(); // Refresh to load latest records
+    }
+}
+
+async function addService() {
+    const name = document.getElementById('service-name').value.trim();
+    const price = document.getElementById('service-price').value.trim();
+    const duration = document.getElementById('service-time').value.trim();
+    const commissionType = document.getElementById('service-commission-type').value;
+
+    if (!name || !price || !duration) {
+        alert("Please fill in all service details.");
+        return;
+    }
+
+    const { error } = await window.supabaseClient
+        .from('services')
+        .insert([{ 
+            name: name, 
+            price: parseFloat(price), 
+            duration: parseInt(duration), 
+            commission_type: commissionType 
+        }]);
+
+    if (error) {
+        alert("Error adding service: " + error.message);
+    } else {
+        alert("Service added successfully!");
+        document.getElementById('service-name').value = '';
+        document.getElementById('service-price').value = '';
+        document.getElementById('service-time').value = '';
+        location.reload(); // Refresh to load latest records
+    }
+}
+    
     // --- WAITING MINI-GAME SCRIPT ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');

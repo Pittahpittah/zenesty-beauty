@@ -148,7 +148,7 @@
             </div>
 
             <label>Select Technician:</label>
-            <select id="client-tech-select" required>
+            <select id="client-tech-select" required onchange="updateAvailableSlots()">
                 <option value="">Loading Technicians...</option>
             </select>
 
@@ -157,15 +157,9 @@
 
             <label>Select Time Slot (07:00 - 21:00):</label>
             <select id="booking-time" required>
-                <option value="">Select Time Slot</option>
-                <option value="07:00">07:00 AM</option>
-                <option value="09:00">09:00 AM</option>
-                <option value="11:00">11:00 AM</option>
-                <option value="13:00">01:00 PM</option>
-                <option value="15:00">03:00 PM</option>
-                <option value="17:00">05:00 PM</option>
-                <option value="19:00">07:00 PM</option>
+                <option value="">-- Select service, technician & date first --</option>
             </select>
+            <div id="slot-message" style="font-size: 0.85rem; color: #ffc107; margin-top: 5px;"></div>
 
             <label>Your Phone Number:</label>
             <input type="tel" id="client-phone" placeholder="07XXXXXXXX" required>
@@ -318,6 +312,7 @@
         await loadStaffData();
         await loadServicesData();
         loadEarningsReport();
+        loadPublicSchedule();
     });
 
     async function loadStaffData() {
@@ -366,7 +361,7 @@
             if (clientServicesEl) {
                 clientServicesEl.innerHTML = servicesData.map(srv => `
                     <label style="display: block; margin-bottom: 5px; cursor: pointer;">
-                        <input type="checkbox" name="service" value="${srv.name}" data-price="${srv.price}" data-duration="${srv.duration || 30}" onchange="calculateDeposit()"> ${srv.name} - KSh ${srv.price} (${srv.category || 'General'}) [${srv.duration || 30}m]
+                        <input type="checkbox" name="service" value="${srv.name}" data-price="${srv.price}" data-duration="${srv.duration || 30}" onchange="handleServiceSelectionChange()"> ${srv.name} - KSh ${srv.price} (${srv.category || 'General'}) [${srv.duration || 30}m]
                     </label>
                 `).join('');
             }
@@ -423,13 +418,105 @@
         }
     }
 
-    // --- BOOKING VALIDATION & DATE RULES ---
+    // --- BOOKING VALIDATION & DYNAMIC SLOT GENERATION ---
     function validateBookingDate(input) {
         const selectedDate = new Date(input.value);
         const dayOfWeek = selectedDate.getDay(); // 0 is Sunday
         if (dayOfWeek === 0) {
             alert("Sunday is CLOSED for bookings. Please select another day.");
             input.value = "";
+            return;
+        }
+        updateAvailableSlots();
+    }
+
+    function handleServiceSelectionChange() {
+        calculateDeposit();
+        updateAvailableSlots();
+    }
+
+    async function updateAvailableSlots() {
+        const tech = document.getElementById('client-tech-select').value;
+        const date = document.getElementById('booking-date').value;
+        const checkedServices = document.querySelectorAll('input[name="service"]:checked');
+        const timeSelect = document.getElementById('booking-time');
+        const msg = document.getElementById('slot-message');
+
+        if (!tech || !date || checkedServices.length === 0) {
+            timeSelect.innerHTML = '<option value="">-- Select service, technician & date first --</option>';
+            msg.textContent = '';
+            return;
+        }
+
+        // 1. Calculate total duration needed for selected services
+        let totalServiceMinutes = 0;
+        checkedServices.forEach(cb => {
+            totalServiceMinutes += parseInt(cb.getAttribute('data-duration') || 30);
+        });
+        const bufferTime = 30; // mandatory 30-min buffer
+        const totalNeededBlock = totalServiceMinutes + bufferTime;
+
+        // 2. Fetch existing bookings for this technician on this date
+        const { data: existingBookings, error } = await window.supabaseClient
+            .from('bookings')
+            .select('*')
+            .eq('technician', tech)
+            .eq('date', date)
+            .in('status', ['pending', 'confirmed']);
+
+        if (error) {
+            console.error("Error fetching bookings:", error);
+        }
+
+        // 3. Generate all 30-minute intervals from 07:00 to 21:00
+        const startWork = 7 * 60;   // 07:00 in minutes
+        const endWork = 21 * 60;    // 21:00 in minutes
+        let allSlots = [];
+
+        for (let m = startWork; m + totalNeededBlock <= endWork; m += 30) {
+            const h = Math.floor(m / 60).toString().padStart(2, '0');
+            const min = (m % 60).toString().padStart(2, '0');
+            allSlots.push(`${h}:${min}`);
+        }
+
+        // 4. Filter out overlapping time blocks
+        const bookedIntervals = [];
+        if (existingBookings) {
+            existingBookings.forEach(b => {
+                const [bH, bM] = b.start_time.split(':').map(Number);
+                const bStartMins = bH * 60 + bM;
+                const bEndMins = bStartMins + (b.total_duration || 60);
+                bookedIntervals.push({ start: bStartMins, end: bEndMins });
+            });
+        }
+
+        const availableSlots = allSlots.filter(slotStr => {
+            const [sH, sM] = slotStr.split(':').map(Number);
+            const slotStartMins = sH * 60 + sM;
+            const slotEndMins = slotStartMins + totalNeededBlock;
+
+            // Check overlap with any existing booking
+            for (let b of bookedIntervals) {
+                if (Math.max(slotStartMins, b.start) < Math.min(slotEndMins, b.end)) {
+                    return false; // Overlaps!
+                }
+            }
+            return true;
+        });
+
+        // 5. Populate dropdown
+        timeSelect.innerHTML = '';
+        if (availableSlots.length === 0) {
+            msg.textContent = "⚠️ No available time slots found for this date/technician.";
+            timeSelect.innerHTML = '<option value="">Fully Booked</option>';
+        } else {
+            msg.textContent = `✅ Showing available slots (Service: ${totalServiceMinutes}m + 30m buffer):`;
+            availableSlots.forEach(slot => {
+                const opt = document.createElement('option');
+                opt.value = slot;
+                opt.textContent = slot;
+                timeSelect.appendChild(opt);
+            });
         }
     }
 
@@ -447,61 +534,23 @@
         event.preventDefault();
         const tech = document.getElementById('client-tech-select').value;
         const date = document.getElementById('booking-date').value;
-        const timeSlot = document.getElementById('booking-time').value; // e.g., "09:00"
+        const timeSlot = document.getElementById('booking-time').value;
         const phone = document.getElementById('client-phone').value;
         const mpesa = document.getElementById('mpesa-code').value;
         const checkedServices = document.querySelectorAll('input[name="service"]:checked');
 
-        if (checkedServices.length === 0) {
-            alert("Please select at least one service.");
+        if (checkedServices.length === 0 || !timeSlot) {
+            alert("Please select at least one service and a valid time slot.");
             return;
         }
 
-        // 1. Calculate total duration including the required 30-minute buffer
         let totalServiceMinutes = 0;
         checkedServices.forEach(cb => {
-            const duration = parseInt(cb.getAttribute('data-duration') || 30);
-            totalServiceMinutes += duration;
+            totalServiceMinutes += parseInt(cb.getAttribute('data-duration') || 30);
         });
-        
-        // Add the mandatory 30-minute buffer after service
         const totalDurationWithBuffer = totalServiceMinutes + 30;
 
-        // 2. Parse start time and calculate end time
-        const [startHour, startMinute] = timeSlot.split(':').map(Number);
-        const startTimeInMinutes = startHour * 60 + startMinute;
-        const endTimeInMinutes = startTimeInMinutes + totalDurationWithBuffer;
-
-        // 3. Ensure booking does not exceed closing time (21:00 / 1260 minutes)
-        const closingTimeInMinutes = 21 * 60; 
-        if (endTimeInMinutes > closingTimeInMinutes) {
-            alert(`This booking exceeds operating hours (closes at 21:00). Total duration including buffer is ${totalDurationWithBuffer} minutes.`);
-            return;
-        }
-
-        // 4. Check for overlapping bookings for the selected technician on that date
-        const { data: existingBookings, error: fetchError } = await window.supabaseClient
-            .from('bookings')
-            .select('*')
-            .eq('technician', tech)
-            .eq('date', date)
-            .in('status', ['pending', 'confirmed']);
-
-        if (!fetchError && existingBookings) {
-            for (let booking of existingBookings) {
-                const [bStartHour, bStartMin] = booking.start_time.split(':').map(Number);
-                const bStartInMins = bStartHour * 60 + bStartMin;
-                const bEndInMins = bStartInMins + (booking.total_duration || 60);
-
-                // Check overlap condition
-                if (startTimeInMinutes < bEndInMins && endTimeInMinutes > bStartInMins) {
-                    alert(`Conflict: Technician ${tech} already has a booking from ${booking.start_time} overlapping this time slot. Please choose another time or technician.`);
-                    return;
-                }
-            }
-        }
-
-        // 5. Insert booking into Supabase with calculated total duration
+        // Insert booking into Supabase
         const { error: insertError } = await window.supabaseClient
             .from('bookings')
             .insert([{
@@ -520,7 +569,32 @@
             alert(`Booking request submitted successfully! Total reserved time block: ${totalDurationWithBuffer} mins (includes 30m buffer).`);
             document.getElementById('booking-form').reset();
             document.getElementById('deposit-amount').innerText = "KSh 0";
+            document.getElementById('booking-time').innerHTML = '<option value="">-- Select service, technician & date first --</option>';
+            loadPublicSchedule();
         }
+    }
+
+    async function loadPublicSchedule() {
+        const scheduleEl = document.getElementById('public-schedule-list');
+        if (!scheduleEl) return;
+
+        const { data, error } = await window.supabaseClient
+            .from('bookings')
+            .select('*')
+            .in('status', ['pending', 'confirmed'])
+            .order('date', { ascending: true });
+
+        if (error || !data || data.length === 0) {
+            scheduleEl.innerHTML = "<p>No active reservations.</p>";
+            return;
+        }
+
+        scheduleEl.innerHTML = data.map(b => `
+            <div style="background: #14281d; padding: 8px; margin-bottom: 6px; border-radius: 4px;">
+                <strong>Date:</strong> ${b.date} | <strong>Time:</strong> ${b.start_time} (${b.total_duration}m block)<br>
+                <small style="color: #b0c4b8;">Tech: ${b.technician} | Status: ${b.status}</small>
+            </div>
+        `).join('');
     }
 
     // --- DATABASE CRUD OPERATIONS FOR STAFF & SERVICES ---
@@ -623,7 +697,6 @@
             return;
         }
 
-        // Verify technician password against staff table
         const { data: staffData, error: staffError } = await window.supabaseClient
             .from('staff')
             .select('*')
@@ -635,12 +708,10 @@
             return;
         }
 
-        // Calculate payout based on selected mandatory percentage
         const totalAmount = parseFloat(amountEarned);
         const tierPercent = parseFloat(percentageTier);
         const calculatedPayout = (totalAmount * tierPercent) / 100;
 
-        // Insert record into earnings table (storing tech name, service, tier, amount, and payout)
         const { error: insertError } = await window.supabaseClient
             .from('earnings')
             .insert([{

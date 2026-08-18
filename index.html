@@ -366,7 +366,7 @@
             if (clientServicesEl) {
                 clientServicesEl.innerHTML = servicesData.map(srv => `
                     <label style="display: block; margin-bottom: 5px; cursor: pointer;">
-                        <input type="checkbox" name="service" value="${srv.name}" data-price="${srv.price}" onchange="calculateDeposit()"> ${srv.name} - KSh ${srv.price} (${srv.category || 'General'})
+                        <input type="checkbox" name="service" value="${srv.name}" data-price="${srv.price}" data-duration="${srv.duration || 30}" onchange="calculateDeposit()"> ${srv.name} - KSh ${srv.price} (${srv.category || 'General'}) [${srv.duration || 30}m]
                     </label>
                 `).join('');
             }
@@ -443,11 +443,11 @@
         document.getElementById('deposit-amount').innerText = `KSh ${deposit.toFixed(2)}`;
     }
 
-    function handleClientBooking(event) {
+    async function handleClientBooking(event) {
         event.preventDefault();
         const tech = document.getElementById('client-tech-select').value;
         const date = document.getElementById('booking-date').value;
-        const time = document.getElementById('booking-time').value;
+        const timeSlot = document.getElementById('booking-time').value; // e.g., "09:00"
         const phone = document.getElementById('client-phone').value;
         const mpesa = document.getElementById('mpesa-code').value;
         const checkedServices = document.querySelectorAll('input[name="service"]:checked');
@@ -456,14 +456,71 @@
             alert("Please select at least one service.");
             return;
         }
-        if (!tech || !date || !time || !phone || !mpesa) {
-            alert("Please fill in all booking details.");
+
+        // 1. Calculate total duration including the required 30-minute buffer
+        let totalServiceMinutes = 0;
+        checkedServices.forEach(cb => {
+            const duration = parseInt(cb.getAttribute('data-duration') || 30);
+            totalServiceMinutes += duration;
+        });
+        
+        // Add the mandatory 30-minute buffer after service
+        const totalDurationWithBuffer = totalServiceMinutes + 30;
+
+        // 2. Parse start time and calculate end time
+        const [startHour, startMinute] = timeSlot.split(':').map(Number);
+        const startTimeInMinutes = startHour * 60 + startMinute;
+        const endTimeInMinutes = startTimeInMinutes + totalDurationWithBuffer;
+
+        // 3. Ensure booking does not exceed closing time (21:00 / 1260 minutes)
+        const closingTimeInMinutes = 21 * 60; 
+        if (endTimeInMinutes > closingTimeInMinutes) {
+            alert(`This booking exceeds operating hours (closes at 21:00). Total duration including buffer is ${totalDurationWithBuffer} minutes.`);
             return;
         }
 
-        alert("Booking request submitted successfully! A 30-minute buffer has been reserved.");
-        document.getElementById('booking-form').reset();
-        document.getElementById('deposit-amount').innerText = "KSh 0";
+        // 4. Check for overlapping bookings for the selected technician on that date
+        const { data: existingBookings, error: fetchError } = await window.supabaseClient
+            .from('bookings')
+            .select('*')
+            .eq('technician', tech)
+            .eq('date', date)
+            .in('status', ['pending', 'confirmed']);
+
+        if (!fetchError && existingBookings) {
+            for (let booking of existingBookings) {
+                const [bStartHour, bStartMin] = booking.start_time.split(':').map(Number);
+                const bStartInMins = bStartHour * 60 + bStartMin;
+                const bEndInMins = bStartInMins + (booking.total_duration || 60);
+
+                // Check overlap condition
+                if (startTimeInMinutes < bEndInMins && endTimeInMinutes > bStartInMins) {
+                    alert(`Conflict: Technician ${tech} already has a booking from ${booking.start_time} overlapping this time slot. Please choose another time or technician.`);
+                    return;
+                }
+            }
+        }
+
+        // 5. Insert booking into Supabase with calculated total duration
+        const { error: insertError } = await window.supabaseClient
+            .from('bookings')
+            .insert([{
+                technician: tech,
+                date: date,
+                start_time: timeSlot,
+                total_duration: totalDurationWithBuffer,
+                phone: phone,
+                mpesa_code: mpesa,
+                status: 'pending'
+            }]);
+
+        if (insertError) {
+            alert("Error submitting booking: " + insertError.message);
+        } else {
+            alert(`Booking request submitted successfully! Total reserved time block: ${totalDurationWithBuffer} mins (includes 30m buffer).`);
+            document.getElementById('booking-form').reset();
+            document.getElementById('deposit-amount').innerText = "KSh 0";
+        }
     }
 
     // --- DATABASE CRUD OPERATIONS FOR STAFF & SERVICES ---

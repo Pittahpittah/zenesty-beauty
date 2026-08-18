@@ -68,13 +68,19 @@
             border-radius: 8px;
         }
 
-        input, select, button {
+        input, select, button, textarea {
             width: 100%;
             padding: 10px;
             margin: 8px 0;
             border-radius: 5px;
             border: 1px solid #ccc;
             box-sizing: border-box;
+            background: #254633;
+            color: #ffffff;
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: #b0c4b8;
         }
 
         button.action-btn {
@@ -103,17 +109,6 @@
             margin-bottom: 15px;
         }
 
-        /* Waiting Mini-Game Container */
-        #game-container {
-            text-align: center;
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 30px;
-        }
-
-        canvas { background: #000; border-radius: 5px; }
-
         .hidden { display: none; }
     </style>
 </head>
@@ -122,7 +117,7 @@
 <div class="container">
     <!-- Header / Branding -->
     <header style="text-align: center; margin-bottom: 20px;">
-        <img id="app-logo" src="https://via.placeholder.com/80" alt="Logo" style="border-radius: 50%; width: 80px; height: 80px;">
+        <img id="app-logo" src="https://via.placeholder.com/80" alt="Logo" style="border-radius: 50%; width: 80px; height: 80px; object-fit: cover;">
         <h1 id="app-title">Zenesty Beauty Studio</h1>
     </header>
 
@@ -143,28 +138,33 @@
     <div id="client-tab" class="tab-content active">
         <h2>Book an Appointment</h2>
         <div class="notice-banner">
-            ⚠️ <strong>Booking Policy:</strong> Bookings must be made 1 day in advance. Sunday is CLOSED. A non-refundable 30% booking fee applies if unattended. A 30-minute buffer is automatically reserved after every service.
+            ⚠️ <strong>Booking Policy:</strong> Operating hours are <strong>7:00 AM – 9:00 PM (7:00–21:00)</strong>. Sunday is <strong>CLOSED</strong>. Bookings must be made 1 day in advance. A 30% booking fee applies. A 30-minute buffer is automatically reserved after every service.
         </div>
 
-        <form id="booking-form">
+        <form id="booking-form" onsubmit="handleClientBooking(event)">
             <label>Select Service(s):</label>
             <div id="client-services-list" class="card">
                 <!-- Services loaded dynamically -->
             </div>
 
             <label>Select Technician:</label>
-            <select id="client-tech-select" required></select>
+            <select id="client-tech-select" required>
+                <option value="">Loading Technicians...</option>
+            </select>
 
-            <label>Select Booking Date (Must be 1 day in advance):</label>
-            <input type="date" id="booking-date" required>
+            <label>Select Booking Date (Must be 1 day in advance, Sundays closed):</label>
+            <input type="date" id="booking-date" required onchange="validateBookingDate(this)">
 
-            <label>Select Time Slot:</label>
+            <label>Select Time Slot (07:00 - 21:00):</label>
             <select id="booking-time" required>
-                <option value="08:00">08:00 AM</option>
-                <option value="10:00">10:00 AM</option>
-                <option value="12:00">12:00 PM</option>
-                <option value="14:00">02:00 PM</option>
-                <option value="16:00">04:00 PM</option>
+                <option value="">Select Time Slot</option>
+                <option value="07:00">07:00 AM</option>
+                <option value="09:00">09:00 AM</option>
+                <option value="11:00">11:00 AM</option>
+                <option value="13:00">01:00 PM</option>
+                <option value="15:00">03:00 PM</option>
+                <option value="17:00">05:00 PM</option>
+                <option value="19:00">07:00 PM</option>
             </select>
 
             <label>Your Phone Number:</label>
@@ -186,7 +186,7 @@
         <div class="card" style="margin-top: 20px;">
             <h3>Reserved / Allocated Slots</h3>
             <div id="public-schedule-list">
-                <!-- Shows reserved slots -->
+                <p>No active reservations.</p>
             </div>
         </div>
     </div>
@@ -196,28 +196,42 @@
         <h2>Technician Daily Earnings Portal</h2>
         <div class="card">
             <label>Select Your Name:</label>
-            <select id="tech-name-select"></select>
+            <select id="tech-name-select">
+                <option value="">Loading Staff...</option>
+            </select>
 
             <label>Tech Password:</label>
-            <input type="password" id="tech-pass-input">
+            <input type="password" id="tech-pass-input" placeholder="Enter password">
 
             <label>Service Completed:</label>
-            <select id="tech-service-done"></select>
+            <select id="tech-service-done">
+                <option value="">Loading Services...</option>
+            </select>
+
+            <label>Service Percentage Tier Completed (%):</label>
+            <select id="tech-percentage-select" required>
+                <option value="">Select Percentage Tier</option>
+                <option value="25">25% Tier</option>
+                <option value="30">30% Tier</option>
+                <option value="40">40% Standard Commission</option>
+                <option value="50">50% Special/Wash/Undo Commission</option>
+                <option value="100">100% Full Amount</option>
+            </select>
 
             <label>Amount Earned (KSh):</label>
-            <input type="number" id="tech-earning-amount">
+            <input type="number" id="tech-earning-amount" placeholder="Enter total service price/amount">
 
-            <button onclick="submitTechEarning()" class="action-btn">Record Earning</button>
+            <button type="button" onclick="submitTechEarning()" class="action-btn">Record Earning & Percentage Choice</button>
         </div>
     </div>
 
     <!-- ================= ADMIN SPACE ================= -->
     <div id="admin-tab" class="tab-content">
         <h2>Admin Control Center</h2>
-        <div class="card">
+        <div class="card" id="admin-login-card">
             <label>Admin Password:</label>
-            <input type="password" id="admin-pass">
-            <button onclick="verifyAdmin()" class="action-btn">Login Admin</button>
+            <input type="password" id="admin-pass" placeholder="Enter admin password">
+            <button type="button" onclick="verifyAdmin()" class="action-btn">Login Admin</button>
         </div>
 
         <div id="admin-controls" class="hidden">
@@ -236,8 +250,8 @@
                 </select>
 
                 <label>Change App Logo URL:</label>
-                <input type="text" id="logo-url-input" placeholder="Paste Image Link">
-                <button onclick="updateLogo()">Update Logo</button>
+                <input type="text" id="logo-url-input" placeholder="Paste Image Link Here">
+                <button type="button" onclick="updateLogo()">Update Logo</button>
             </div>
 
             <!-- Manage Staff -->
@@ -245,53 +259,51 @@
                 <h3>Manage Staff / Technicians</h3>
                 <input type="text" id="new-tech-name" placeholder="Tech Name">
                 <input type="text" id="new-tech-pass" placeholder="Set Tech Password">
-                <button onclick="addTech()" class="action-btn">Add Staff</button>
-                <div id="admin-tech-list"></div>
+                <button type="button" onclick="addTech()" class="action-btn">Add Staff</button>
+                <div id="admin-tech-list" style="margin-top: 10px;"></div>
             </div>
 
-            <!-- Manage Services -->
+            <!-- Manage Services & Categories -->
             <div class="card">
-                <h3>Manage Services & Duration</h3>
+                <h3>Manage Services & Categories</h3>
                 <input type="text" id="service-name" placeholder="Service Name (e.g., Dreadlocks retouch)">
+                <select id="service-category">
+                    <option value="Nails">Nails</option>
+                    <option value="Dreadlocks">Dreadlocks</option>
+                    <option value="Hair">Hair</option>
+                    <option value="Spa">Spa & Treatment</option>
+                </select>
                 <input type="number" id="service-price" placeholder="Price (KSh)">
                 <input type="number" id="service-time" placeholder="Time required (Minutes)">
-                <select id="service-commission-type">
-                    <option value="40">Standard Service (40% Tech Commission)</option>
-                    <option value="50-wash">Wash (50% Tech Commission)</option>
-                    <option value="50-undo">Undo (50% Tech Commission)</option>
-                </select>
-                <button onclick="addService()" class="action-btn">Add Service</button>
-                <div id="admin-services-list"></div>
+                <button type="button" onclick="addService()" class="action-btn">Add New Service</button>
+                <div id="admin-services-list" style="margin-top: 15px;"></div>
             </div>
 
             <!-- Offers Control -->
             <div class="card">
                 <h3>Special Offers / Notifications</h3>
                 <textarea id="offer-input" placeholder="Type offer details here..."></textarea>
-                <button onclick="toggleOffer(true)" class="action-btn">Publish Offer</button>
-                <button onclick="toggleOffer(false)" style="background:#d9534f; color:white;">Hide Offer</button>
+                <button type="button" onclick="toggleOffer(true)" class="action-btn">Publish Offer</button>
+                <button type="button" onclick="toggleOffer(false)" style="background:#d9534f; color:white;">Hide Offer</button>
             </div>
 
             <!-- Pending Bookings Approval -->
             <div class="card">
                 <h3>Client Booking Requests</h3>
-                <div id="admin-bookings-list"></div>
+                <div id="admin-bookings-list">
+                    <p>No pending bookings.</p>
+                </div>
             </div>
 
-            <!-- Worker Earnings & Calculations -->
+            <!-- Worker Earnings & Selected Percentages Report -->
             <div class="card">
-                <h3>Staff Financials & Commission Breakdown</h3>
-                <p><em>(Calculated automatically: Wash & Undo @ 50%, All other services @ 40%)</em></p>
-                <div id="admin-earnings-report"></div>
+                <h3>Staff Financials & Chosen Percentage Breakdown</h3>
+                <p><em>Displays each technician's submitted earnings alongside their chosen service percentage tier.</em></p>
+                <div id="admin-earnings-report">
+                    <p>No earnings submitted yet.</p>
+                </div>
             </div>
         </div>
-    </div>
-
-    <!-- ================= WAITING MINI-GAME ================= -->
-    <div id="game-container">
-        <h3>Waiting Game: Tap to Bounce</h3>
-        <canvas id="gameCanvas" width="280" height="150"></canvas>
-        <p>Score: <span id="game-score">0</span></p>
     </div>
 </div>
 
@@ -303,28 +315,36 @@
 
     // --- LOAD DATA FROM SUPABASE ON PAGE LOAD ---
     window.addEventListener('DOMContentLoaded', async () => {
-        // 1. Fetch and render Staff
+        await loadStaffData();
+        await loadServicesData();
+        loadEarningsReport();
+    });
+
+    async function loadStaffData() {
         const { data: staffData, error: staffError } = await window.supabaseClient.from('staff').select('*');
         if (!staffError && staffData) {
             const techListEl = document.getElementById('admin-tech-list');
             const techSelectEl = document.getElementById('tech-name-select');
+            const clientTechSelectEl = document.getElementById('client-tech-select');
             
             if (techListEl) {
                 techListEl.innerHTML = staffData.map(s => `
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; background: #14281d; padding: 8px; border-radius: 4px;">
                         <span>${s.name}</span>
-                        <button onclick="deleteTech('${s.id}')" style="background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">Remove</button>
+                        <button type="button" onclick="deleteTech('${s.id}')" style="background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; width: auto;">Remove</button>
                     </div>
                 `).join('');
             }
 
-            if (techSelectEl) {
-                techSelectEl.innerHTML = '<option value="">Select Technician</option>' + 
-                    staffData.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
-            }
-        }
+            const techOptions = '<option value="">Select Technician</option>' + 
+                staffData.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
 
-        // 2. Fetch and render Services
+            if (techSelectEl) techSelectEl.innerHTML = techOptions;
+            if (clientTechSelectEl) clientTechSelectEl.innerHTML = techOptions;
+        }
+    }
+
+    async function loadServicesData() {
         const { data: servicesData, error: servicesError } = await window.supabaseClient.from('services').select('*');
         if (!servicesError && servicesData) {
             const servicesListEl = document.getElementById('admin-services-list');
@@ -332,21 +352,26 @@
             const clientServicesEl = document.getElementById('client-services-list');
 
             if (servicesListEl) {
-                servicesListEl.innerHTML = servicesData.map(srv => `<div class="service-item"><span>${srv.name} - KSh ${srv.price} (${srv.duration}m)</span></div>`).join('');
+                servicesListEl.innerHTML = servicesData.map(srv => `
+                    <div class="service-item" style="background: #14281d; padding: 8px; margin-bottom: 6px; border-radius: 4px; border-bottom: none;">
+                        <span><strong>[${srv.category || 'General'}]</strong> ${srv.name} - KSh ${srv.price} (${srv.duration || 30}m)</span>
+                        <button type="button" onclick="deleteService('${srv.id}')" style="background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; width: auto;">Delete</button>
+                    </div>
+                `).join('');
             }
             if (serviceDoneEl) {
                 serviceDoneEl.innerHTML = '<option value="">Select Service Completed</option>' + 
-                    servicesData.map(srv => `<option value="${srv.name}">${srv.name}</option>`).join('');
+                    servicesData.map(srv => `<option value="${srv.name}">${srv.name} (KSh ${srv.price})</option>`).join('');
             }
             if (clientServicesEl) {
                 clientServicesEl.innerHTML = servicesData.map(srv => `
-                    <label style="display: block; margin-bottom: 5px;">
-                        <input type="checkbox" name="service" value="${srv.name}" data-price="${srv.price}"> ${srv.name} (KSh ${srv.price})
+                    <label style="display: block; margin-bottom: 5px; cursor: pointer;">
+                        <input type="checkbox" name="service" value="${srv.name}" data-price="${srv.price}" onchange="calculateDeposit()"> ${srv.name} - KSh ${srv.price} (${srv.category || 'General'})
                     </label>
                 `).join('');
             }
         }
-    });
+    }
     
     // --- TAB SWITCHING ---
     function showTab(tabId) {
@@ -359,6 +384,7 @@
         const pass = document.getElementById('admin-pass').value;
         if(pass === "3030") {
             document.getElementById('admin-controls').classList.remove('hidden');
+            alert("Admin verified successfully!");
         } else {
             alert("Incorrect Admin Password!");
         }
@@ -372,8 +398,13 @@
         document.documentElement.style.setProperty('--font-family', font);
     }
     function updateLogo() {
-        const url = document.getElementById('logo-url-input').value;
-        if(url) document.getElementById('app-logo').src = url;
+        const url = document.getElementById('logo-url-input').value.trim();
+        if(url) {
+            document.getElementById('app-logo').src = url;
+            alert("Logo updated successfully!");
+        } else {
+            alert("Please enter a valid image URL.");
+        }
     }
 
     // --- OFFERS MANAGEMENT ---
@@ -381,11 +412,58 @@
         const banner = document.getElementById('offer-banner');
         const text = document.getElementById('offer-input').value;
         if(show) {
+            if(!text.trim()) {
+                alert("Please enter offer details first.");
+                return;
+            }
             document.getElementById('offer-text').innerText = text;
             banner.classList.remove('hidden');
         } else {
             banner.classList.add('hidden');
         }
+    }
+
+    // --- BOOKING VALIDATION & DATE RULES ---
+    function validateBookingDate(input) {
+        const selectedDate = new Date(input.value);
+        const dayOfWeek = selectedDate.getDay(); // 0 is Sunday
+        if (dayOfWeek === 0) {
+            alert("Sunday is CLOSED for bookings. Please select another day.");
+            input.value = "";
+        }
+    }
+
+    function calculateDeposit() {
+        const checkboxes = document.querySelectorAll('input[name="service"]:checked');
+        let total = 0;
+        checkboxes.forEach(cb => {
+            total += parseFloat(cb.getAttribute('data-price') || 0);
+        });
+        const deposit = total * 0.3;
+        document.getElementById('deposit-amount').innerText = `KSh ${deposit.toFixed(2)}`;
+    }
+
+    function handleClientBooking(event) {
+        event.preventDefault();
+        const tech = document.getElementById('client-tech-select').value;
+        const date = document.getElementById('booking-date').value;
+        const time = document.getElementById('booking-time').value;
+        const phone = document.getElementById('client-phone').value;
+        const mpesa = document.getElementById('mpesa-code').value;
+        const checkedServices = document.querySelectorAll('input[name="service"]:checked');
+
+        if (checkedServices.length === 0) {
+            alert("Please select at least one service.");
+            return;
+        }
+        if (!tech || !date || !time || !phone || !mpesa) {
+            alert("Please fill in all booking details.");
+            return;
+        }
+
+        alert("Booking request submitted successfully! A 30-minute buffer has been reserved.");
+        document.getElementById('booking-form').reset();
+        document.getElementById('deposit-amount').innerText = "KSh 0";
     }
 
     // --- DATABASE CRUD OPERATIONS FOR STAFF & SERVICES ---
@@ -408,36 +486,7 @@
             alert("Staff added successfully!");
             document.getElementById('new-tech-name').value = '';
             document.getElementById('new-tech-pass').value = '';
-            location.reload();
-        }
-    }
-
-    async function addService() {
-        const name = document.getElementById('service-name').value.trim();
-        const price = document.getElementById('service-price').value.trim();
-        const duration = document.getElementById('service-time').value.trim();
-
-        if (!name || !price || !duration) {
-            alert("Please fill in all service details.");
-            return;
-        }
-
-        const { error } = await window.supabaseClient
-            .from('services')
-            .insert([{ 
-                name: name, 
-                price: parseFloat(price), 
-                duration: parseInt(duration)
-            }]);
-
-        if (error) {
-            alert("Error adding service: " + error.message);
-        } else {
-            alert("Service added successfully!");
-            document.getElementById('service-name').value = '';
-            document.getElementById('service-price').value = '';
-            document.getElementById('service-time').value = '';
-            location.reload();
+            await loadStaffData();
         }
     }
 
@@ -453,37 +502,131 @@
             alert("Error deleting staff: " + error.message);
         } else {
             alert("Staff removed successfully!");
-            location.reload();
+            await loadStaffData();
         }
     }
-    
-    // --- WAITING MINI-GAME SCRIPT ---
-    const canvas = document.getElementById('gameCanvas');
-    if (canvas) {
-        const ctx = canvas.getContext('2d');
-        let ballY = 75, ballDY = 0, score = 0;
-        
-        canvas.addEventListener('click', () => { 
-            ballDY = -4; 
-            score++; 
-            const scoreEl = document.getElementById('game-score');
-            if (scoreEl) scoreEl.innerText = score; 
-        });
 
-        function updateGame() {
-            ballDY += 0.2;
-            ballY += ballDY;
-            if(ballY > 140) { ballY = 140; ballDY = 0; }
-            if(ballY < 10) { ballY = 10; }
+    async function addService() {
+        const name = document.getElementById('service-name').value.trim();
+        const category = document.getElementById('service-category').value;
+        const price = document.getElementById('service-price').value.trim();
+        const duration = document.getElementById('service-time').value.trim();
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#2d5a3f';
-            ctx.beginPath();
-            ctx.arc(140, ballY, 10, 0, Math.PI * 2);
-            ctx.fill();
-            requestAnimationFrame(updateGame);
+        if (!name || !price || !duration) {
+            alert("Please fill in all service details.");
+            return;
         }
-        updateGame();
+
+        const { error } = await window.supabaseClient
+            .from('services')
+            .insert([{ 
+                name: name, 
+                category: category,
+                price: parseFloat(price), 
+                duration: parseInt(duration)
+            }]);
+
+        if (error) {
+            alert("Error adding service: " + error.message);
+        } else {
+            alert("Service added successfully!");
+            document.getElementById('service-name').value = '';
+            document.getElementById('service-price').value = '';
+            document.getElementById('service-time').value = '';
+            await loadServicesData();
+        }
+    }
+
+    async function deleteService(serviceId) {
+        if (!confirm("Are you sure you want to remove this service?")) return;
+
+        const { error } = await window.supabaseClient
+            .from('services')
+            .delete()
+            .eq('id', serviceId);
+
+        if (error) {
+            alert("Error deleting service: " + error.message);
+        } else {
+            alert("Service removed successfully!");
+            await loadServicesData();
+        }
+    }
+
+    // --- TECHNICIAN EARNINGS & PERCENTAGE SUBMISSION ---
+    async function submitTechEarning() {
+        const techName = document.getElementById('tech-name-select').value;
+        const techPass = document.getElementById('tech-pass-input').value.trim();
+        const serviceDone = document.getElementById('tech-service-done').value;
+        const percentageTier = document.getElementById('tech-percentage-select').value;
+        const amountEarned = document.getElementById('tech-earning-amount').value.trim();
+
+        if (!techName || !techPass || !serviceDone || !percentageTier || !amountEarned) {
+            alert("Please fill in all fields and select your percentage tier.");
+            return;
+        }
+
+        // Verify technician password against staff table
+        const { data: staffData, error: staffError } = await window.supabaseClient
+            .from('staff')
+            .select('*')
+            .eq('name', techName)
+            .single();
+
+        if (staffError || !staffData || staffData.password !== techPass) {
+            alert("Incorrect Technician Password!");
+            return;
+        }
+
+        // Calculate payout based on selected mandatory percentage
+        const totalAmount = parseFloat(amountEarned);
+        const tierPercent = parseFloat(percentageTier);
+        const calculatedPayout = (totalAmount * tierPercent) / 100;
+
+        // Insert record into earnings table (storing tech name, service, tier, amount, and payout)
+        const { error: insertError } = await window.supabaseClient
+            .from('earnings')
+            .insert([{
+                tech_name: techName,
+                service: serviceDone,
+                percentage_tier: tierPercent + '%',
+                amount: totalAmount,
+                payout: calculatedPayout
+            }]);
+
+        if (insertError) {
+            alert("Error recording earning in database: " + insertError.message);
+        } else {
+            alert(`Earning recorded successfully! Tier: ${tierPercent}%, Calculated Tech Payout: KSh ${calculatedPayout}`);
+            document.getElementById('tech-pass-input').value = '';
+            document.getElementById('tech-earning-amount').value = '';
+            document.getElementById('tech-service-done').value = '';
+            document.getElementById('tech-percentage-select').value = '';
+            loadEarningsReport();
+        }
+    }
+
+    async function loadEarningsReport() {
+        const reportEl = document.getElementById('admin-earnings-report');
+        if (!reportEl) return;
+
+        const { data, error } = await window.supabaseClient.from('earnings').select('*');
+        if (error || !data || data.length === 0) {
+            reportEl.innerHTML = "<p>No earnings recorded yet.</p>";
+            return;
+        }
+
+        reportEl.innerHTML = data.map(e => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #2d5a3f;">
+                <div>
+                    <strong>${e.tech_name}</strong> - ${e.service}<br>
+                    <small style="color: #b0c4b8;">Tier Chosen: <strong>${e.percentage_tier || 'N/A'}</strong> | Total: KSh ${e.amount}</small>
+                </div>
+                <div style="text-align: right;">
+                    <span style="color: #4CAF50; font-weight: bold;">Payout: KSh ${e.payout || e.amount}</span>
+                </div>
+            </div>
+        `).join('');
     }
 </script>
 </body>
